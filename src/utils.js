@@ -10,8 +10,8 @@ export const readFile = pify(fs.readFile);
 
 export const sitemapsUtils = {
     getDeclarations: function () {
-        return `<?xml version="1.0" encoding="UTF-8"?>` +
-            `<?xml-stylesheet type="text/xsl" href="sitemap.xsl"?>`;
+        return `<?xml version="1.0" encoding="UTF-8"?>`;
+            // `<?xml-stylesheet type="text/xsl" href="sitemap.xsl"?>`;
     }
 };
 

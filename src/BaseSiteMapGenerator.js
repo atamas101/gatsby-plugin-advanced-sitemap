@@ -9,8 +9,9 @@ import * as utils from './utils';
 const XMLNS_DECLS = {
     _attr: {
         xmlns: `http://www.sitemaps.org/schemas/sitemap/0.9`,
-        'xmlns:image': `http://www.google.com/schemas/sitemap-image/1.1`
-    }
+        "xmlns:image": `http://www.google.com/schemas/sitemap-image/1.1`,
+        "xmlns:news": `http://www.google.com/schemas/sitemap-news/0.9`,
+    },
 };
 
 export default class BaseSiteMapGenerator {
@@ -24,21 +25,25 @@ export default class BaseSiteMapGenerator {
     generateXmlFromNodes(options) {
         const self = this;
         // Get a mapping of node to timestamp
-        const timedNodes = _.map(this.nodeLookup, function (node, id) {
-            return {
-                id: id,
-                // Using negative here to sort newest to oldest
-                ts: -(self.nodeTimeLookup[id] || 0),
-                node: node
-            };
-        }, []);
+        const timedNodes = _.map(
+            this.nodeLookup,
+            function (node, id) {
+                return {
+                    id: id,
+                    // Using negative here to sort newest to oldest
+                    ts: -(self.nodeTimeLookup[id] || 0),
+                    node: node,
+                };
+            },
+            []
+        );
         // Sort nodes by timestamp
         const sortedNodes = _.sortBy(timedNodes, `ts`);
         // Grab just the nodes
         const urlElements = _.map(sortedNodes, `node`);
         const data = {
             // Concat the elements to the _attr declaration
-            urlset: [XMLNS_DECLS].concat(urlElements)
+            urlset: [XMLNS_DECLS].concat(urlElements),
         };
 
         // Return the xml
@@ -66,7 +71,8 @@ export default class BaseSiteMapGenerator {
 
     getLastModifiedForDatum(datum) {
         if (datum.updated_at || datum.published_at || datum.created_at) {
-            const modifiedDate = datum.updated_at || datum.published_at || datum.created_at;
+            const modifiedDate =
+                datum.updated_at || datum.published_at || datum.created_at;
 
             return moment(new Date(modifiedDate));
         } else {
@@ -83,13 +89,18 @@ export default class BaseSiteMapGenerator {
     }
 
     createUrlNodeFromDatum(url, datum) {
-        let node, imgNode;
+        let node, imgNode, newsNode;
 
         node = {
             url: [
-                {loc: url},
-                {lastmod: moment(this.getLastModifiedForDatum(datum), moment.ISO_8601).toISOString()}
-            ]
+                { loc: url },
+                {
+                    lastmod: moment(
+                        this.getLastModifiedForDatum(datum),
+                        moment.ISO_8601
+                    ).toISOString(),
+                },
+            ],
         };
 
         imgNode = this.createImageNodeFromDatum(datum);
@@ -98,12 +109,17 @@ export default class BaseSiteMapGenerator {
             node.url.push(imgNode);
         }
 
+        newsNode = this.createNewsNodeFromDatum(datum);
+        if (newsNode) {
+            node.url.push(newsNode);
+        }
         return node;
     }
 
     createImageNodeFromDatum(datum) {
         // Check for cover first because user has cover but the rest only have image
-        const image = datum.cover_image || datum.profile_image || datum.feature_image;
+        const image =
+            datum.cover_image || datum.profile_image || datum.feature_image;
         let imageEl;
 
         if (!image) {
@@ -112,12 +128,41 @@ export default class BaseSiteMapGenerator {
 
         // Create the weird xml node syntax structure that is expected
         imageEl = [
-            {'image:loc': image},
-            {'image:caption': path.basename(image)}
+            { "image:loc": image },
+            { "image:caption": path.basename(image) },
         ];
 
         // Return the node to be added to the url xml node
-        return { 'image:image': imageEl } //eslint-disable-line
+        return { "image:image": imageEl }; //eslint-disable-line
+    }
+
+    createNewsNodeFromDatum(datum) {
+        // Check for cover first because user has cover but the rest only have image
+        const news = datum.type_news;
+        let newsEl;
+
+        if (!news) {
+            return;
+        }
+
+        // Create the weird xml node syntax structure that is expected
+        newsEl = [
+            {
+                "news:publication": [
+                    { "news:name": "Fortune Education" },
+                    { "news:language": "en" },
+                ],
+            },
+            {
+                "news:publication_date": moment(
+                    this.getLastModifiedForDatum(datum),
+                    moment.ISO_8601
+                ).toISOString(),
+            },
+            { "news:title": datum.title },
+        ];
+        // Return the node to be added to the url xml node
+        return { "news:news": newsEl }; //eslint-disable-line
     }
 
     validateImageUrl(imageUrl) {
