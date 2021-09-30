@@ -80,6 +80,17 @@ export default class BaseSiteMapGenerator {
         }
     }
 
+    getPublishedAtForDatum(datum) {
+        if (datum.published_at || datum.created_at || datum.updated_at) {
+            const publishedAt =
+                datum.published_at || datum.created_at || datum.updated_at;
+
+            return moment(new Date(publishedAt));
+        } else {
+            return moment(new Date());
+        }
+    }
+
     updateLastModified(datum) {
         const lastModified = this.getLastModifiedForDatum(datum);
 
@@ -155,7 +166,7 @@ export default class BaseSiteMapGenerator {
             },
             {
                 "news:publication_date": moment(
-                    this.getLastModifiedForDatum(datum),
+                    this.getPublishedAtForDatum(datum),
                     moment.ISO_8601
                 ).toISOString(),
             },
