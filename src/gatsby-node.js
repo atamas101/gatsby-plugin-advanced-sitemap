@@ -157,7 +157,7 @@ const serializeSources = ({mapping, additionalSitemaps = []}) => {
     return sitemaps;
 };
 
-const runQuery = (handler, {query, mapping, exclude}) => handler(query).then((r) => {
+const runQuery =  (handler, {query, mapping, exclude}) => handler(query).then(async(r) => {
     if (r.errors) {
         throw new Error(r.errors.join(`, `));
     }
@@ -166,7 +166,7 @@ const runQuery = (handler, {query, mapping, exclude}) => handler(query).then((r)
         // Check for custom serializer
         if (typeof mapping?.[source]?.serializer === `function`) {
             if (r.data[source] && Array.isArray(r.data[source].edges)) { 
-                const serializedEdges = mapping[source].serializer(r.data[source].edges);
+                const serializedEdges = await Promise.resolve(mapping[source].serializer(r.data[source].edges));
 
                 if (!Array.isArray(serializedEdges)) {
                     throw new Error(`Custom sitemap serializer must return an array`);
@@ -183,6 +183,7 @@ const runQuery = (handler, {query, mapping, exclude}) => handler(query).then((r)
                 
                 excludedRoute = typeof excludedRoute === `object` ? excludedRoute : excludedRoute.replace(/^\/|\/$/, ``);
 
+                
                 // test if the passed regular expression is valid
                 if (typeof excludedRoute === `object`) {
                     let excludedRouteIsValidRegEx = true;
