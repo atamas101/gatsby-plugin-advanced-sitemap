@@ -1,4 +1,4 @@
-const {onRenderBody} = require(`../gatsby-ssr`);
+const { onRenderBody } = require(`../gatsby-ssr`);
 
 const defaultPathPrefix = global.__PATH_PREFIX__;
 
@@ -14,13 +14,13 @@ describe(`Adds <Link> for site to head`, () => {
     it(`creates Link if createLinkInHead is true`, async () => {
         const pluginOptions = {
             createLinkInHead: true,
-            output: `sitemap.xml`
+            output: `sitemap.xml`,
         };
         const setHeadComponents = jest.fn();
 
         await onRenderBody(
             {
-                setHeadComponents
+                setHeadComponents,
             },
             pluginOptions
         );
@@ -32,13 +32,13 @@ describe(`Adds <Link> for site to head`, () => {
     it(`does not create Link if createLinkInHead is false`, async () => {
         const pluginOptions = {
             createLinkInHead: false,
-            output: `sitemap.xml`
+            output: `sitemap.xml`,
         };
         const setHeadComponents = jest.fn();
 
         await onRenderBody(
             {
-                setHeadComponents
+                setHeadComponents,
             },
             pluginOptions
         );
@@ -52,13 +52,13 @@ describe(`Adds <Link> for site to head`, () => {
 
         const pluginOptions = {
             createLinkInHead: true,
-            output: `sitemap.xml`
+            output: `sitemap.xml`,
         };
         const setHeadComponents = jest.fn();
 
         await onRenderBody(
             {
-                setHeadComponents
+                setHeadComponents,
             },
             pluginOptions
         );

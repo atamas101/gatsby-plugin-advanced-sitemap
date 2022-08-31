@@ -3,8 +3,8 @@ jest.mock(`fs-extra`);
 const fs = require(`fs-extra`);
 const path = require(`path`);
 
-const {onPostBuild} = require(`../gatsby-node`);
-const utils = require('../utils');
+const { onPostBuild } = require(`../gatsby-node`);
+const utils = require(`../utils`);
 
 const pathPrefix = ``;
 
@@ -29,8 +29,8 @@ describe(`Test plugin sitemap`, () => {
             data: {
                 site: {
                     siteMetadata: {
-                        siteUrl: `http://dummy.url`
-                    }
+                        siteUrl: `http://dummy.url`,
+                    },
                 },
                 allSitePage: {
                     edges: [
@@ -38,22 +38,22 @@ describe(`Test plugin sitemap`, () => {
                             node: {
                                 id: 1,
                                 slug: `page-1`,
-                                url: `http://dummy.url/page-1`
-                            }
+                                url: `http://dummy.url/page-1`,
+                            },
                         },
                         {
                             node: {
                                 id: 2,
                                 slug: `page-2`,
-                                url: `http://dummy.url/page-2`
-                            }
-                        }
-                    ]
-                }
-            }
+                                url: `http://dummy.url/page-2`,
+                            },
+                        },
+                    ],
+                },
+            },
         });
 
-        await onPostBuild({graphql, pathPrefix}, {});
+        await onPostBuild({ graphql, pathPrefix }, {});
 
         const [filePath] = utils.outputFile.mock.calls[0];
 
@@ -76,8 +76,8 @@ describe(`Test plugin sitemap`, () => {
             data: {
                 site: {
                     siteMetadata: {
-                        siteUrl: `http://dummy.url`
-                    }
+                        siteUrl: `http://dummy.url`,
+                    },
                 },
                 allSitePage: {
                     edges: [
@@ -85,19 +85,19 @@ describe(`Test plugin sitemap`, () => {
                             node: {
                                 id: 1,
                                 slug: `page-1`,
-                                url: `http://dummy.url/page-1`
-                            }
+                                url: `http://dummy.url/page-1`,
+                            },
                         },
                         {
                             node: {
                                 id: 2,
                                 slug: `/exclude-page`,
-                                url: `http://dummy.url/post/exclude-page`
-                            }
-                        }
-                    ]
-                }
-            }
+                                url: `http://dummy.url/post/exclude-page`,
+                            },
+                        },
+                    ],
+                },
+            },
         });
 
         const customQuery = `
@@ -125,10 +125,10 @@ describe(`Test plugin sitemap`, () => {
                 return edge;
             }),
             exclude: [`/post/exclude-page`],
-            query: customQuery
+            query: customQuery,
         };
 
-        await onPostBuild({graphql, pathPrefix}, options);
+        await onPostBuild({ graphql, pathPrefix }, options);
 
         const [filePath] = utils.outputFile.mock.calls[0];
 
@@ -143,8 +143,8 @@ describe(`sitemap index`, () => {
         data: {
             site: {
                 siteMetadata: {
-                    siteUrl: `http://dummy.url`
-                }
+                    siteUrl: `http://dummy.url`,
+                },
             },
             allSitePage: {
                 edges: [
@@ -152,19 +152,19 @@ describe(`sitemap index`, () => {
                         node: {
                             id: 1,
                             slug: `page-1`,
-                            url: `http://dummy.url/page-1`
-                        }
+                            url: `http://dummy.url/page-1`,
+                        },
                     },
                     {
                         node: {
                             id: 2,
                             slug: `/exclude-page`,
-                            url: `http://dummy.url/post/exclude-page`
-                        }
-                    }
-                ]
-            }
-        }
+                            url: `http://dummy.url/post/exclude-page`,
+                        },
+                    },
+                ],
+            },
+        },
     };
     beforeEach(() => {
         graphql = jest.fn();
@@ -174,18 +174,18 @@ describe(`sitemap index`, () => {
         fs.createWriteStream.mockReturnValue({
             once: jest.fn((event, cb) => cb()),
             write: jest.fn(),
-            end: jest.fn()
+            end: jest.fn(),
         });
 
         fs.statSync.mockReset();
         fs.statSync.mockReturnValue({
-            isDirectory: jest.fn(() => true)
+            isDirectory: jest.fn(() => true),
         });
     });
 
     it(`set Prefix to sitemaps`, async () => {
         const options = {
-            prefix: `posts/`
+            prefix: `posts/`,
         };
         utils.renameFile = jest.fn();
         utils.renameFile.mockResolvedValue(true);
@@ -196,7 +196,7 @@ describe(`sitemap index`, () => {
         utils.outputFile = jest.fn();
         utils.outputFile.mockResolvedValue(true);
 
-        await onPostBuild({graphql, pathPrefix}, options);
+        await onPostBuild({ graphql, pathPrefix }, options);
         const [sitemap] = utils.outputFile.mock.calls[0];
 
         expect(sitemap).toEqual(path.join(`public`, `sitemap.xml`));

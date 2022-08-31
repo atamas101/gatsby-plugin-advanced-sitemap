@@ -1,6 +1,6 @@
 import SiteMapIndexGenerator from './IndexMapGenerator';
 import SiteMapGenerator from './SiteMapGenerator';
-import _ from 'lodash';
+import uniq from 'lodash/uniq';
 
 export default class SiteMapManager {
     constructor(options) {
@@ -16,7 +16,7 @@ export default class SiteMapManager {
         }
 
         // ensure, we have a cleaned up array
-        sitemapTypes = _.uniq(sitemapTypes);
+        sitemapTypes = uniq(sitemapTypes);
 
         // create sitemaps for each type
         sitemapTypes.forEach((type) => {
@@ -34,7 +34,7 @@ export default class SiteMapManager {
         sitemapTypes.forEach(type => types[type] = this[type]);
 
         return new SiteMapIndexGenerator({
-            types: types
+            types: types,
         });
     }
 
@@ -52,7 +52,7 @@ export default class SiteMapManager {
 
     // This is the equivalent of adding the URLs on bootstrap by listening to the events
     // like we do in Ghost core
-    addUrls(type, {url, node}) {
+    addUrls(type, { url, node }) {
         return this[type].addUrl(url, node);
     }
 }

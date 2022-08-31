@@ -1,163 +1,31 @@
 import path from 'path';
-import url from 'url';
-import _ from 'lodash';
+import uniqBy from 'lodash/uniqBy';
+import merge from 'lodash/merge';
 
-import defaultOptions from './defaults';
+import defaultOptions, { DEFAULTMAPPING, DEFAULTQUERY, PUBLICPATH, RESOURCESFILE, XSLFILE } from './defaults';
 import Manager from './SiteMapManager';
 
 import * as utils from './utils';
+import { addPageNodes, serializeMarkdownNodes, serializeSources } from './serializers';
+import { getNodePath } from './helpers';
 
-const PUBLICPATH = `./public`;
-const RESOURCESFILE = `/sitemap-:resource.xml`;
-const XSLFILE = path.resolve(__dirname, `./static/sitemap.xsl`);
-const DEFAULTQUERY = `{
-  allSitePage {
-    edges {
-      node {
-        id
-        slug: path
-        url: path
-      }
-    }
-  }
-  site {
-    siteMetadata {
-      siteUrl
-    }
-    pathPrefix
-  }
-}`;
-const DEFAULTMAPPING = {
-    allSitePage: {
-        sitemap: `pages`
-    }
-};
-let siteURL, pathPrefix;
+let siteURL;
 
-const copyStylesheet = async ({siteUrl, pathPrefix, indexOutput}) => {
+const copyStylesheet = async ({ siteUrl, pathPrefix, indexOutput }) => {
     const siteRegex = /(\{\{blog-url\}\})/g;
 
     // Get our stylesheet template
     const data = await utils.readFile(XSLFILE);
 
     // Replace the `{{blog-url}}` variable with our real site URL
-    const sitemapStylesheet = data.toString().replace(siteRegex, url.resolve(siteUrl, path.join(pathPrefix, indexOutput)));
+    const sitemapStylesheet = data.toString().replace(siteRegex, new URL(path.join(pathPrefix, indexOutput), siteUrl).toString());
 
     // Save the updated stylesheet to the public folder, so it will be
     // available for the xml sitemap files
     await utils.writeFile(path.join(PUBLICPATH, `sitemap.xsl`), sitemapStylesheet);
 };
 
-const serializeMarkdownNodes = (node) => {
-    if (!node.slug && !node.fields.slug) {
-        throw Error(`\`slug\` is a required field`);
-    }
-
-    if (!node.slug) {
-        node.slug = node.fields.slug;
-        delete node.fields.slug;
-    }
-
-    if (node.frontmatter) {
-        if (node.frontmatter.published_at) {
-            node.published_at = node.frontmatter.published_at;
-            delete node.frontmatter.published_at;
-        }
-        if (node.frontmatter.feature_image) {
-            node.feature_image = node.frontmatter.feature_image;
-            delete node.frontmatter.feature_image;
-        }
-    }
-
-    return node;
-};
-
-// Compare our node paths with the ones that Gatsby has generated and updated them
-// with the "real" used ones.
-const getNodePath = (node, allSitePage) => {
-    if (!node.path || node.path === `/`) {
-        return node;
-    }
-    const slugRegex = new RegExp(`${node.path.replace(/\/$/, ``)}$`, `gi`);
-
-    for (let page of allSitePage.edges) {
-        if (page?.node?.url && page.node.url.replace(/\/$/, ``).match(slugRegex)) {
-            node.path = page.node.url;
-            break;
-        }
-    }
-
-    return node;
-};
-
-// Add all other URLs that Gatsby generated, using siteAllPage,
-// but we didn't fetch with our queries
-const addPageNodes = (parsedNodesArray, allSiteNodes, siteUrl, pathPrefix) => {
-    const [parsedNodes] = parsedNodesArray;
-    const pageNodes = [];
-    const addedPageNodes = {pages: []};
-
-    const usedNodes = allSiteNodes.filter(({node}) => {
-        let foundOne;
-        for (let type in parsedNodes) {
-            parsedNodes[type].forEach(((fetchedNode) => {
-                if (node.url === fetchedNode.node.path) {
-                    foundOne = true;
-                }
-            }));
-        }
-        return foundOne;
-    });
-
-    const remainingNodes = _.difference(allSiteNodes, usedNodes);
-
-    remainingNodes.forEach(({node}) => {
-        addedPageNodes.pages.push({
-            url: url.resolve(siteUrl, path.join(pathPrefix, node.url)),
-            node: node
-        });
-    });
-
-    pageNodes.push(addedPageNodes);
-
-    return pageNodes;
-};
-
-const serializeSources = ({mapping, additionalSitemaps = []}) => {
-    let sitemaps = [];
-
-    for (let resourceType in mapping) {
-        sitemaps.push(mapping[resourceType]);
-    }
-
-    sitemaps = _.map(sitemaps, (source) => {
-        // Ignore the key and only return the name and
-        // source as we need those to create the index
-        // and the belonging sources accordingly
-        return {
-            name: source.name || source.sitemap,
-            sitemap: source.sitemap || `pages`
-        };
-    });
-
-    if (Array.isArray(additionalSitemaps)) {
-        additionalSitemaps.forEach((addSitemap, index) => {
-            if (!addSitemap.url) {
-                throw new Error(`URL is required for additional Sitemap: `, addSitemap);
-            }
-            sitemaps.push({
-                name: `external-${addSitemap.name || addSitemap.sitemap || `pages-${index}`}`,
-                url: addSitemap.url
-            });
-        });
-    }
-
-    sitemaps = _.uniqBy(sitemaps, `name`);
-
-    return sitemaps;
-};
-
-const runQuery =  (handler, {query, mapping, exclude}) => handler(query).then(async(r) => {
+const runQuery = (handler, { query, mapping, exclude }) => handler(query).then((r) => {
     if (r.errors) {
         throw new Error(r.errors.join(`, `));
     }
@@ -177,13 +45,12 @@ const runQuery =  (handler, {query, mapping, exclude}) => handler(query).then(as
 
         // Removing excluded paths
         if (r.data?.[source]?.edges && r.data[source].edges.length) {
-            r.data[source].edges = r.data[source].edges.filter(({node}) => !exclude.some((excludedRoute) => { 
+            r.data[source].edges = r.data[source].edges.filter(({ node }) => !exclude.some((excludedRoute) => { 
                 const sourceType = node.__typename ? `all${node.__typename}` : source;
                 const slug = (sourceType === `allMarkdownRemark` || sourceType === `allMdx`) || (node?.fields?.slug) ? node.fields.slug.replace(/^\/|\/$/, ``) : node.slug.replace(/^\/|\/$/, ``);
                 
                 excludedRoute = typeof excludedRoute === `object` ? excludedRoute : excludedRoute.replace(/^\/|\/$/, ``);
 
-                
                 // test if the passed regular expression is valid
                 if (typeof excludedRoute === `object`) {
                     let excludedRouteIsValidRegEx = true;
@@ -208,12 +75,20 @@ const runQuery =  (handler, {query, mapping, exclude}) => handler(query).then(as
     return r.data;
 });
 
-const serialize = ({...sources} = {}, {site, allSitePage}, {mapping, addUncaughtPages}) => {
+const serialize = ({ ...sources } = {}, { site, allSitePage }, { mapping, addUncaughtPages }) => {
     const nodes = [];
     const sourceObject = {};
 
+    const allSitePagePathNodeMap = new Map();
+    
+    allSitePage.edges.forEach((page) => {
+        if (page?.node?.url){
+            const pathurl = page.node.url.replace(/\/$/,``);
+            allSitePagePathNodeMap.set(pathurl, pathurl);
+        }
+    });
+
     siteURL = site.siteMetadata.siteUrl;
-    pathPrefix = site.pathPrefix;
 
     for (let type in sources) {
         if (mapping?.[type]?.sitemap) {
@@ -221,8 +96,7 @@ const serialize = ({...sources} = {}, {site, allSitePage}, {mapping, addUncaught
 
             if (currentSource) {
                 sourceObject[mapping[type].sitemap] = sourceObject[mapping[type].sitemap] || [];
-                currentSource.edges.map((item) => {
-                    let node = item.node? item.node : item;
+                currentSource.edges.map(({ node }) => {
                     if (!node) {
                         return;
                     }
@@ -245,16 +119,17 @@ const serialize = ({...sources} = {}, {site, allSitePage}, {mapping, addUncaught
                     }
 
                     // get the real path for the node, which is generated by Gatsby
-                    node = getNodePath(node, allSitePage);
+                    node = getNodePath(node, allSitePagePathNodeMap);
 
                     sourceObject[mapping[type].sitemap].push({
-                        url: url.resolve(siteURL, path.join(pathPrefix, node.path)),
-                        node: node
+                        url: new URL(node.path, siteURL).toString(),
+                        node: node,
                     });
                 });
             }
         }
     }
+
     nodes.push(sourceObject);
 
     // Get all additionally created page URLs that have been generated by Gatsby
@@ -269,20 +144,20 @@ const serialize = ({...sources} = {}, {site, allSitePage}, {mapping, addUncaught
         }
     }
 
-    nodes[0].pages = _.uniqBy(nodes[0].pages, `url`);
+    nodes[0].pages = uniqBy(nodes[0].pages, `url`);
 
     return nodes;
 };
 
-exports.onPostBuild = async ({graphql, pathPrefix}, pluginOptions) => {
+exports.onPostBuild = async ({ graphql, pathPrefix }, pluginOptions) => {
     let queryRecords;
 
     // Passing the config option addUncaughtPages will add all pages which are not covered by passed mappings
     // to the default `pages` sitemap. Otherwise they will be ignored.
-    const options = pluginOptions.addUncaughtPages ? _.merge(defaultOptions, pluginOptions) : Object.assign({}, defaultOptions, pluginOptions);
+    const options = pluginOptions.addUncaughtPages ? merge(defaultOptions, pluginOptions) : Object.assign({}, defaultOptions, pluginOptions);
 
-    const indexSitemapFile = path.join(PUBLICPATH, '', options.output);
-    const resourcesSitemapFile = path.join(PUBLICPATH, '', RESOURCESFILE);
+    const indexSitemapFile = path.join(PUBLICPATH, pathPrefix, options.output);
+    const resourcesSitemapFile = path.join(PUBLICPATH, pathPrefix, RESOURCESFILE);
 
     delete options.plugins;
     delete options.createLinkInHead;
@@ -295,7 +170,7 @@ exports.onPostBuild = async ({graphql, pathPrefix}, pluginOptions) => {
     // query or mapping
     const defaultQueryRecords = await runQuery(
         graphql,
-        {query: DEFAULTQUERY, exclude: options.exclude}
+        { query: DEFAULTQUERY, exclude: options.exclude }
     );
 
     // Don't run this query when no query and mapping is passed
@@ -336,7 +211,7 @@ exports.onPostBuild = async ({graphql, pathPrefix}, pluginOptions) => {
             // for each passed name we want to receive the related source type
             resourcesSiteMapsArray.push({
                 type: type.name,
-                xml: manager.getSiteMapXml(type.sitemap, options)
+                xml: manager.getSiteMapXml(type.sitemap, options),
             });
         }
     });
