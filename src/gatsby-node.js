@@ -25,55 +25,76 @@ const copyStylesheet = async ({ siteUrl, pathPrefix, indexOutput }) => {
     await utils.writeFile(path.join(PUBLICPATH, `sitemap.xsl`), sitemapStylesheet);
 };
 
-const runQuery = (handler, { query, mapping, exclude }) => handler(query).then((r) => {
-    if (r.errors) {
-        throw new Error(r.errors.join(`, `));
-    }
+const runQuery = (handler, { query, mapping, exclude }) =>
+    handler(query).then(async (r) => {
+        if (r.errors) {
+            throw new Error(r.errors.join(`, `));
+        }
 
-    for (let source in r.data) {
-        // Check for custom serializer
-        if (typeof mapping?.[source]?.serializer === `function`) {
-            if (r.data[source] && Array.isArray(r.data[source].edges)) { 
-                const serializedEdges = await Promise.resolve(mapping[source].serializer(r.data[source].edges));
+        for (let source in r.data) {
+            // Check for custom serializer
+            if (typeof mapping?.[source]?.serializer === `function`) {
+                if (r.data[source] && Array.isArray(r.data[source].edges)) {
+                    const serializedEdges = await Promise.resolve(
+                        mapping[source].serializer(r.data[source].edges)
+                    );
 
-                if (!Array.isArray(serializedEdges)) {
-                    throw new Error(`Custom sitemap serializer must return an array`);
+                    if (!Array.isArray(serializedEdges)) {
+                        throw new Error(
+                            `Custom sitemap serializer must return an array`
+                        );
+                    }
+                    r.data[source].edges = serializedEdges;
                 }
-                r.data[source].edges = serializedEdges;
+            }
+
+            // Removing excluded paths
+            if (r.data?.[source]?.edges && r.data[source].edges.length) {
+                r.data[source].edges = r.data[source].edges.filter(
+                    ({ node }) =>
+                        !exclude.some((excludedRoute) => {
+                            const sourceType = node.__typename
+                                ? `all${node.__typename}`
+                                : source;
+                            const slug =
+                                sourceType === `allMarkdownRemark` ||
+                                sourceType === `allMdx` ||
+                                node?.fields?.slug
+                                    ? node.fields.slug.replace(/^\/|\/$/, ``)
+                                    : node.slug.replace(/^\/|\/$/, ``);
+
+                            excludedRoute =
+                                typeof excludedRoute === `object`
+                                    ? excludedRoute
+                                    : excludedRoute.replace(/^\/|\/$/, ``);
+
+                            // test if the passed regular expression is valid
+                            if (typeof excludedRoute === `object`) {
+                                let excludedRouteIsValidRegEx = true;
+                                try {
+                                    new RegExp(excludedRoute);
+                                } catch (e) {
+                                    excludedRouteIsValidRegEx = false;
+                                }
+
+                                if (!excludedRouteIsValidRegEx) {
+                                    throw new Error(
+                                        `Excluded route is not a valid RegExp: `,
+                                        excludedRoute
+                                    );
+                                }
+
+                                return excludedRoute.test(slug);
+                            } else {
+                                return slug.indexOf(excludedRoute) >= 0;
+                            }
+                        })
+                );
             }
         }
 
-        // Removing excluded paths
-        if (r.data?.[source]?.edges && r.data[source].edges.length) {
-            r.data[source].edges = r.data[source].edges.filter(({ node }) => !exclude.some((excludedRoute) => { 
-                const sourceType = node.__typename ? `all${node.__typename}` : source;
-                const slug = (sourceType === `allMarkdownRemark` || sourceType === `allMdx`) || (node?.fields?.slug) ? node.fields.slug.replace(/^\/|\/$/, ``) : node.slug.replace(/^\/|\/$/, ``);
-                
-                excludedRoute = typeof excludedRoute === `object` ? excludedRoute : excludedRoute.replace(/^\/|\/$/, ``);
-
-                // test if the passed regular expression is valid
-                if (typeof excludedRoute === `object`) {
-                    let excludedRouteIsValidRegEx = true;
-                    try {
-                        new RegExp(excludedRoute);
-                    } catch (e) {
-                        excludedRouteIsValidRegEx = false;
-                    }
-
-                    if (!excludedRouteIsValidRegEx) {
-                        throw new Error(`Excluded route is not a valid RegExp: `, excludedRoute);
-                    }
-
-                    return excludedRoute.test(slug);
-                } else {
-                    return slug.indexOf(excludedRoute) >= 0;
-                }
-            }));
-        }
-    }
-
-    return r.data;
-});
+        return r.data;
+    });
 
 const serialize = ({ ...sources } = {}, { site, allSitePage }, { mapping, addUncaughtPages }) => {
     const nodes = [];
