@@ -99,7 +99,7 @@ plugins: [
                 allGhostPost: {
                     sitemap: `posts`,
                     // Add a query level prefix to slugs, Don't get confused with global path prefix from Gatsby
-                    // This will add a prefix to this perticular sitemap only
+                    // This will add a prefix to this particular sitemap only
                     prefix: 'your-prefix/',
                     // Custom Serializer 
                     serializer: (edges) => {
@@ -170,4 +170,4 @@ yarn test
 
 # Copyright & License
 
-Copyright (c) 2013-2021 [Ghost Foundation](https://ghost.org/) - Released under the [MIT license](LICENSE).
+Copyright (c) 2013-2022 [Ghost Foundation](https://ghost.org/) - Released under the [MIT license](LICENSE).

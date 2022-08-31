@@ -1,4 +1,4 @@
-import _ from 'lodash';
+import sortBy from 'lodash/sortBy';
 import xml from 'xml';
 import moment from 'moment';
 import path from 'path';
@@ -15,6 +15,7 @@ const XMLNS_DECLS = {
 };
 
 export default class BaseSiteMapGenerator {
+    ISO8601_FORMAT = `YYYY-MM-DDTHH:mm:ssZ`;
     constructor() {
         this.nodeLookup = {};
         this.nodeTimeLookup = {};
@@ -25,22 +26,18 @@ export default class BaseSiteMapGenerator {
     generateXmlFromNodes(options) {
         const self = this;
         // Get a mapping of node to timestamp
-        const timedNodes = _.map(
-            this.nodeLookup,
-            function (node, id) {
-                return {
-                    id: id,
-                    // Using negative here to sort newest to oldest
-                    ts: -(self.nodeTimeLookup[id] || 0),
-                    node: node,
-                };
-            },
-            []
-        );
+        const timedNodes = Object.values(this.nodeLookup).map((node, id) => {
+            return {
+                id: id,
+                // Using negative here to sort newest to oldest
+                ts: -(self.nodeTimeLookup[id] || 0),
+                node: node,
+            };
+        });
         // Sort nodes by timestamp
-        const sortedNodes = _.sortBy(timedNodes, `ts`);
+        const sortedNodes = sortBy(timedNodes, `ts`);
         // Grab just the nodes
-        const urlElements = _.map(sortedNodes, `node`);
+        const urlElements = sortedNodes.map(el => el.node);
         const data = {
             // Concat the elements to the _attr declaration
             urlset: [XMLNS_DECLS].concat(urlElements),
@@ -108,7 +105,7 @@ export default class BaseSiteMapGenerator {
                 {
                     lastmod: moment(
                         this.getLastModifiedForDatum(datum),
-                        moment.ISO_8601
+                        this.ISO8601_FORMAT
                     ).toISOString(),
                 },
             ],
@@ -139,8 +136,8 @@ export default class BaseSiteMapGenerator {
 
         // Create the weird xml node syntax structure that is expected
         imageEl = [
-            { "image:loc": image },
-            { "image:caption": path.basename(image) },
+            { 'image:loc': image },
+            { 'image:caption': path.basename(image) },
         ];
 
         // Return the node to be added to the url xml node
