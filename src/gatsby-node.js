@@ -22,15 +22,16 @@ const copyStylesheet = async ({ siteUrl, pathPrefix, indexOutput }) => {
 
     // Save the updated stylesheet to the public folder, so it will be
     // available for the xml sitemap files
-    await utils.writeFile(path.join(PUBLICPATH, `sitemap.xsl`), sitemapStylesheet);
+    await utils.writeFile(path.join(PUBLICPATH, pathPrefix, `sitemap.xsl`), sitemapStylesheet);
 };
 
-const runQuery = (handler, { query, mapping, exclude }) => handler(query).then((r) => {
-    if (r.errors) {
-        throw new Error(r.errors.join(`, `));
-    }
+const runQuery = (handler, { query, mapping, exclude }) =>
+    handler(query).then((r) => {
+        if (r.errors) {
+            throw new Error(r.errors.join(`, `));
+        }
 
-    for (let source in r.data) {
+        for (let source in r.data) {
         // Check for custom serializer
         if (typeof mapping?.[source]?.serializer === `function`) {
             if (r.data[source] && Array.isArray(r.data[source].edges)) { 
@@ -73,17 +74,21 @@ const runQuery = (handler, { query, mapping, exclude }) => handler(query).then((
     }
 
     return r.data;
-});
+    });
 
-const serialize = ({ ...sources } = {}, { site, allSitePage }, { mapping, addUncaughtPages }) => {
+const serialize = (
+    { ...sources } = {},
+    { site, allSitePage },
+    { mapping, addUncaughtPages, pathPrefix }
+) => {
     const nodes = [];
     const sourceObject = {};
 
     const allSitePagePathNodeMap = new Map();
-    
+
     allSitePage.edges.forEach((page) => {
-        if (page?.node?.url){
-            const pathurl = page.node.url.replace(/\/$/,``);
+        if (page?.node?.url) {
+            const pathurl = page.node.url.replace(/\/$/, ``);
             allSitePagePathNodeMap.set(pathurl, pathurl);
         }
     });
@@ -95,13 +100,19 @@ const serialize = ({ ...sources } = {}, { site, allSitePage }, { mapping, addUnc
             const currentSource = sources[type] ? sources[type] : [];
 
             if (currentSource) {
-                sourceObject[mapping[type].sitemap] = sourceObject[mapping[type].sitemap] || [];
+                sourceObject[mapping[type].sitemap] =
+                    sourceObject[mapping[type].sitemap] || [];
                 currentSource.edges.map(({ node }) => {
                     if (!node) {
                         return;
                     }
-                    const nodeType = node.__typename ? `all${node.__typename}` : type;
-                    if (nodeType === `allMarkdownRemark` || nodeType === `allMdx`) {
+                    const nodeType = node?.__typename
+                        ? `all${node?.__typename}`
+                        : type;
+                    if (
+                        nodeType === `allMarkdownRemark` ||
+                        nodeType === `allMdx`
+                    ) {
                         node = serializeMarkdownNodes(node);
                     }
 
@@ -114,7 +125,10 @@ const serialize = ({ ...sources } = {}, { site, allSitePage }, { mapping, addUnc
                         node.path = node.slug;
                     }
 
-                    if (typeof mapping[type].prefix === `string` && mapping[type].prefix !== ``){
+                    if (
+                        typeof mapping[type].prefix === `string` &&
+                        mapping[type].prefix !== ``
+                    ) {
                         node.path = mapping[type].prefix + node.path;
                     }
 
@@ -122,7 +136,7 @@ const serialize = ({ ...sources } = {}, { site, allSitePage }, { mapping, addUnc
                     node = getNodePath(node, allSitePagePathNodeMap);
 
                     sourceObject[mapping[type].sitemap].push({
-                        url: new URL(node.path, siteURL).toString(),
+                        url: new URL(path.join(pathPrefix, node.path), siteURL).toString(),
                         node: node,
                     });
                 });
@@ -151,7 +165,6 @@ const serialize = ({ ...sources } = {}, { site, allSitePage }, { mapping, addUnc
 
 exports.onPostBuild = async ({ graphql, pathPrefix }, pluginOptions) => {
     let queryRecords;
-
     // Passing the config option addUncaughtPages will add all pages which are not covered by passed mappings
     // to the default `pages` sitemap. Otherwise they will be ignored.
     const options = pluginOptions.addUncaughtPages ? merge(defaultOptions, pluginOptions) : Object.assign({}, defaultOptions, pluginOptions);
@@ -182,7 +195,6 @@ exports.onPostBuild = async ({ graphql, pathPrefix }, pluginOptions) => {
 
     // Instanciate the Ghost Sitemaps Manager
     const manager = new Manager(options);
-
     await serialize(queryRecords, defaultQueryRecords, options).forEach((source) => {
         for (let type in source) {
             source[type].forEach((node) => {
@@ -196,7 +208,7 @@ exports.onPostBuild = async ({ graphql, pathPrefix }, pluginOptions) => {
     options.siteUrl = siteURL;
     options.pathPrefix = pathPrefix;
 
-    await copyStylesheet(options);
+    // await copyStylesheet(options);
 
     const resourcesSiteMapsArray = [];
 

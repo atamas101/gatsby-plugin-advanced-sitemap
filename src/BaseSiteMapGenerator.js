@@ -10,6 +10,7 @@ const XMLNS_DECLS = {
     _attr: {
         xmlns: `http://www.sitemaps.org/schemas/sitemap/0.9`,
         'xmlns:image': `http://www.google.com/schemas/sitemap-image/1.1`,
+        "xmlns:news": `http://www.google.com/schemas/sitemap-news/0.9`,
     },
 };
 
@@ -76,6 +77,17 @@ export default class BaseSiteMapGenerator {
         }
     }
 
+    getPublishedAtForDatum(datum) {
+        if (datum.published_at || datum.created_at || datum.updated_at) {
+            const publishedAt =
+                datum.published_at || datum.created_at || datum.updated_at;
+
+            return moment(new Date(publishedAt));
+        } else {
+            return moment(new Date());
+        }
+    }
+
     updateLastModified(datum) {
         const lastModified = this.getLastModifiedForDatum(datum);
 
@@ -84,9 +96,35 @@ export default class BaseSiteMapGenerator {
         }
     }
 
+    createNewsNodeFromDatum(datum) {
+        // Check for cover first because user has cover but the rest only have image
+        const news = datum.type_news;
+        let newsEl;
+        if (!news) {
+            return;
+        }
+        // Create the weird xml node syntax structure that is expected
+        newsEl = [
+            {
+                "news:publication": [
+                    { "news:name": "Fortune Education" },
+                    { "news:language": "en" },
+                ],
+            },
+            {
+                "news:publication_date": moment(
+                    this.getPublishedAtForDatum(datum),
+                    moment.ISO_8601
+                ).toISOString(),
+            },
+            { "news:title": datum.title },
+        ];
+        // Return the node to be added to the url xml node
+        return { "news:news": newsEl }; //eslint-disable-line
+    }
+
     createUrlNodeFromDatum(url, datum) {
-        let node;
-        let imgNode;
+        let node, imgNode, newsNode;
 
         node = {
             url: [
@@ -94,18 +132,21 @@ export default class BaseSiteMapGenerator {
                 {
                     lastmod: moment(
                         this.getLastModifiedForDatum(datum),
-                        this.ISO8601_FORMAT
+                        moment.ISO_8601
                     ).toISOString(),
                 },
             ],
         };
 
         imgNode = this.createImageNodeFromDatum(datum);
-
         if (imgNode) {
             node.url.push(imgNode);
         }
 
+        newsNode = this.createNewsNodeFromDatum(datum);
+        if (newsNode) {
+            node.url.push(newsNode);
+        }
         return node;
     }
 
