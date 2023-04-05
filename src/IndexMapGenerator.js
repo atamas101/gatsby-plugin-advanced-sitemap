@@ -37,7 +37,7 @@ export default class SiteMapIndexGenerator {
         return sources.map((source) => {
             const filePath = resourcesOutput
                 .replace(/:resource/, source.name)
-                .replace(/^\//, ``);
+                // .replace(/^\//, ``);
             const siteMapUrl = source.url
                 ? source.url
                 : new URL(path.join(pathPrefix, filePath), siteUrl).toString();
